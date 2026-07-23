@@ -63,6 +63,7 @@ const DashboardPage: React.FC = () => {
     queryKey: ['notifications', 'recent'],
     queryFn: () => notificationsApi.getAll({ limit: 5 }).then((r) => r.data),
     refetchInterval: 30000,
+    enabled: isAdmin,
   });
 
   const { data: approvedData } = useQuery({
@@ -127,7 +128,7 @@ const DashboardPage: React.FC = () => {
         )}
 
         {/* Recent Data Sections */}
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className={`grid grid-cols-1 gap-6 ${isAdmin ? 'xl:grid-cols-2' : 'xl:grid-cols-1'}`}>
           {/* Recent Incidents Card */}
           <div className="flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#0b1320]/85 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
@@ -171,47 +172,49 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Recent Notifications Card */}
-          <div className="flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#0b1320]/85 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-xl">
-            <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/10 text-indigo-400">
-                  <Bell size={14} />
-                </div>
-                <h3 className="text-sm font-semibold text-white">Recent Notifications</h3>
-              </div>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-zinc-400">
-                Telegram stream
-              </span>
-            </div>
-
-            <div className="flex-1 divide-y divide-white/5 overflow-y-auto">
-              {loadingNotifs ? (
-                <div className="space-y-3 p-6">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="h-12 animate-pulse rounded-2xl bg-white/5" />
-                  ))}
-                </div>
-              ) : notificationsData?.notifications?.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-12 text-zinc-400">
-                  <Bell size={30} className="mb-2 opacity-30" />
-                  <p className="text-sm font-medium">No notification logs recorded</p>
-                </div>
-              ) : (
-                notificationsData?.notifications?.slice(0, 5).map((notif: any) => (
-                  <div key={notif._id} className="flex items-center justify-between px-4 py-3.5 transition-all hover:bg-white/3 sm:px-6">
-                    <div className="min-w-0 flex-1 pr-4">
-                      <p className="truncate text-sm font-semibold text-zinc-200">{notif.userId?.name || 'System Recipient'}</p>
-                      <p className="mt-1 text-[12px] font-medium text-zinc-500">{notif.type?.replace(/_/g, ' ')}</p>
-                    </div>
-                    <div className="shrink-0">
-                      <StatusBadge status={notif.status} />
-                    </div>
+          {/* Recent Notifications Card — Only visible to ADMIN */}
+          {isAdmin && (
+            <div className="flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#0b1320]/85 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/10 text-indigo-400">
+                    <Bell size={14} />
                   </div>
-                ))
-              )}
+                  <h3 className="text-sm font-semibold text-white">Recent Notifications</h3>
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-zinc-400">
+                  Telegram stream
+                </span>
+              </div>
+
+              <div className="flex-1 divide-y divide-white/5 overflow-y-auto">
+                {loadingNotifs ? (
+                  <div className="space-y-3 p-6">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="h-12 animate-pulse rounded-2xl bg-white/5" />
+                    ))}
+                  </div>
+                ) : notificationsData?.notifications?.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-12 text-zinc-400">
+                    <Bell size={30} className="mb-2 opacity-30" />
+                    <p className="text-sm font-medium">No notification logs recorded</p>
+                  </div>
+                ) : (
+                  notificationsData?.notifications?.slice(0, 5).map((notif: any) => (
+                    <div key={notif._id} className="flex items-center justify-between px-4 py-3.5 transition-all hover:bg-white/3 sm:px-6">
+                      <div className="min-w-0 flex-1 pr-4">
+                        <p className="truncate text-sm font-semibold text-zinc-200">{notif.userId?.name || 'System Recipient'}</p>
+                        <p className="mt-1 text-[12px] font-medium text-zinc-500">{notif.type?.replace(/_/g, ' ')}</p>
+                      </div>
+                      <div className="shrink-0">
+                        <StatusBadge status={notif.status} />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

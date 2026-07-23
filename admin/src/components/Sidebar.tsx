@@ -30,7 +30,7 @@ const navItems = [
   { to: '/users/approved', icon: UserCheck, label: 'Approved Users', adminOnly: true },
   { to: '/users/rejected', icon: UserX, label: 'Rejected Users', adminOnly: true },
   { to: '/incidents', icon: AlertTriangle, label: 'Incidents' },
-  { to: '/notifications', icon: Bell, label: 'Notifications' },
+  { to: '/notifications', icon: Bell, label: 'Notifications', adminOnly: true },
   { to: '/audit-logs', icon: FileText, label: 'Audit Logs', adminOnly: true },
 ];
 
