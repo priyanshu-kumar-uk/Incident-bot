@@ -25,13 +25,18 @@ export class AuthController {
   async googleCallback(@Req() req: Request, @Res() res: Response) {
     const user = req.user as UserDocument;
     const token = this.authService.generateJwt(user);
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    const frontendUrl = (
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173'
+    ).replace(/\/$/, '');
+
+    const isProd = process.env.NODE_ENV === 'production';
 
     // Set JWT token in HttpOnly Cookie
+    // In cross-site production (Vercel <-> Render), sameSite must be 'none' and secure must be true
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -40,10 +45,12 @@ export class AuthController {
 
   @Post('logout')
   async logout(@Res() res: Response) {
+    const isProd = process.env.NODE_ENV === 'production';
+
     res.clearCookie('token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
     });
     return res.status(HttpStatus.OK).json({ message: 'Logged out successfully' });
   }
@@ -58,8 +65,8 @@ export class AuthController {
       avatar: user.avatar,
       role: user.role,
       status: user.status,
-      telegramConnected: user.telegramConnected,
-      telegramConnectedAt: user.telegramConnectedAt,
+      telegramConnected: user.telegramConnected || false,
+      telegramChatId: user.telegramChatId || null,
       createdAt: user.createdAt,
     };
   }
