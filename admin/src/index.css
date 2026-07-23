@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --bg-primary: #04070d;
+    --bg-secondary: #0b1220;
+    --bg-card: #101725;
+    --border: rgba(255, 255, 255, 0.1);
+    --text-primary: #f7f8ff;
+    --text-secondary: #8b94aa;
+    --accent: #6366f1;
+    --success: #34d399;
+    --warning: #f59e0b;
+    --danger: #fb7185;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top left, rgba(99, 102, 241, 0.14), transparent 28%),
+      radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.12), transparent 24%),
+      var(--bg-primary);
+    color: var(--text-primary);
+    font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgba(99, 102, 241, 0.35);
+    color: white;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
