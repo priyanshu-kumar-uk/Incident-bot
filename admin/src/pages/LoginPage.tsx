@@ -59,11 +59,6 @@ const LoginPage: React.FC = () => {
             <span>Invite-only access • Admin verification required</span>
           </div>
         </div>
-
-        {/* Footer Security Tagline */}
-        <p className="text-center text-[11px] font-medium text-zinc-400 mt-5">
-          Protected by OAuth 2.0 & Role-Based Access Control (RBAC)
-        </p>
       </div>
     </div>
   );
