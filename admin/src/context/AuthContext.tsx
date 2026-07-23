@@ -9,7 +9,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isPending: boolean;
   logout: () => Promise<void>;
-  refetchUser: () => void;
+  refetchUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -39,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Ignore errors on logout
     } finally {
+      localStorage.removeItem('token');
       setUser(null);
     }
   };
@@ -59,7 +60,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-
-export default AuthContext;
 
 export const useAuth = () => useContext(AuthContext);

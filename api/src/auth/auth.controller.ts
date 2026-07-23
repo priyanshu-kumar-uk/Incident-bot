@@ -29,9 +29,9 @@ export class AuthController {
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173'
     ).replace(/\/$/, '');
 
-    // Force secure & sameSite: 'none' for HTTPS production domains (Vercel <-> Render)
     const isHttps = frontendUrl.startsWith('https://') || process.env.NODE_ENV === 'production';
 
+    // Set JWT token in HttpOnly Cookie
     res.cookie('token', token, {
       httpOnly: true,
       secure: isHttps,
@@ -39,7 +39,8 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    return res.redirect(`${frontendUrl}/auth/callback`);
+    // Pass token as fallback query param for browsers blocking third-party cross-site cookies
+    return res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
   }
 
   @Post('logout')
