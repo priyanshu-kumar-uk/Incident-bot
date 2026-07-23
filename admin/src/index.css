@@ -36,6 +36,15 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Global Cursor Pointer for All Buttons */
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
   ::selection {
     background: rgba(99, 102, 241, 0.35);
     color: white;

@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { io } from 'socket.io-client';
+import { toast } from 'sonner';
 import { authApi } from '../api/endpoints';
 import type { User } from '../types';
 
@@ -31,6 +33,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     fetchUser();
+
+    // Listen to real-time WebSocket events for instant Telegram connection state updates
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
+      transports: ['websocket'],
+    });
+
+    socket.on('telegram.connected', () => {
+      fetchUser();
+      toast.success('Telegram Connected Successfully! 🎉');
+    });
+
+    socket.on('user.approved', () => {
+      fetchUser();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [fetchUser]);
 
   const logout = async () => {

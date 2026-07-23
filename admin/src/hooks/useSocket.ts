@@ -36,6 +36,10 @@ export function useSocket() {
       toast.error(`User rejected: ${data.user?.email}`);
     });
 
+    socket.on('telegram.connected', () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    });
+
     socket.on('incident.created', (data) => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
       toast.warning(`New incident: ${data.incident?.title}`);
