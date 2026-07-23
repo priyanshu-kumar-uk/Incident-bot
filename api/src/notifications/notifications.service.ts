@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { InjectModel } from '@nestjs/mongoose';
@@ -34,6 +34,8 @@ export class NotificationsService {
 
     this.logger.log(`Queuing notifications for ${eligibleUsers.length} users for incident: ${incident.title}`);
 
+    const sentChatIds = new Set<string>();
+
     for (const user of eligibleUsers) {
       if (!user.telegramChatId) continue;
 
@@ -47,6 +49,15 @@ export class NotificationsService {
         status: NotificationStatus.PENDING,
       });
       await notification.save();
+
+      // Deduplicate: If telegramChatId already received this incident's message, update DB status without re-dispatching Telegram API
+      if (sentChatIds.has(user.telegramChatId)) {
+        notification.status = NotificationStatus.SENT;
+        notification.sentAt = new Date();
+        await notification.save();
+        this.eventsGateway.emitNotificationUpdated(notification);
+        continue;
+      }
 
       // 1. Try sending directly via Telegram Bot for instant delivery
       try {
@@ -63,6 +74,7 @@ export class NotificationsService {
         );
 
         if (msg) {
+          sentChatIds.add(user.telegramChatId);
           notification.status = NotificationStatus.SENT;
           notification.sentAt = new Date();
           notification.telegramMessageId = msg.message_id?.toString();
@@ -98,6 +110,7 @@ export class NotificationsService {
             removeOnFail: 100,
           },
         );
+        sentChatIds.add(user.telegramChatId);
       } catch (queueErr) {
         this.logger.error(`BullMQ queue failed for user ${user._id}: ${queueErr.message}`);
       }
@@ -116,87 +129,104 @@ export class NotificationsService {
     await notification.save();
 
     try {
-      await this.telegramService.sendApprovalMessage(user.telegramChatId, user.name);
-      notification.status = NotificationStatus.SENT;
-      notification.sentAt = new Date();
-      await notification.save();
-      this.eventsGateway.emitNotificationUpdated(notification);
-    } catch {
-      try {
-        await this.notificationQueue.add(
-          'send-approval',
-          {
-            notificationId: notification._id.toString(),
-            userId: user._id.toString(),
-            chatId: user.telegramChatId,
-            userName: user.name,
-          },
-          {
-            attempts: 3,
-            backoff: { type: 'fixed', delay: 3000 },
-            removeOnComplete: 20,
-          },
-        );
-      } catch {}
+      const msg = await this.telegramService.sendApprovalMessage(user.telegramChatId, user.name);
+      if (msg) {
+        notification.status = NotificationStatus.SENT;
+        notification.sentAt = new Date();
+        notification.telegramMessageId = msg.message_id?.toString();
+        await notification.save();
+        this.eventsGateway.emitNotificationUpdated(notification);
+        this.logger.log(`Approval notification sent to ${user.name} (${user.email})`);
+      }
+    } catch (err) {
+      this.logger.error(`Failed to send approval notification to ${user._id}: ${err.message}`);
     }
   }
 
   async findAll(page = 1, limit = 20) {
+    return this.getAllNotifications(page, limit);
+  }
+
+  async findById(id: string): Promise<NotificationDocument | null> {
+    return this.notificationModel
+      .findById(id)
+      .populate('userId', 'name email avatar')
+      .populate('incidentId')
+      .exec();
+  }
+
+  async getUserNotifications(userId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [notifications, total] = await Promise.all([
+      this.notificationModel
+        .find({ userId: new Types.ObjectId(userId) })
+        .populate('incidentId')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.notificationModel.countDocuments({ userId: new Types.ObjectId(userId) }).exec(),
+    ]);
+
+    return { notifications, total, page, limit };
+  }
+
+  async getAllNotifications(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const [notifications, total] = await Promise.all([
       this.notificationModel
         .find()
         .populate('userId', 'name email avatar')
-        .populate('incidentId', 'title severity status')
+        .populate('incidentId')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
       this.notificationModel.countDocuments().exec(),
     ]);
+
     return { notifications, total, page, limit };
   }
 
-  async findById(id: string): Promise<NotificationDocument> {
-    return this.notificationModel
-      .findById(id)
-      .populate('userId', 'name email')
-      .populate('incidentId', 'title severity')
-      .exec();
-  }
+  async updateStatus(
+    id: string,
+    status: NotificationStatus,
+    extraData?: { telegramMessageId?: string; errorMessage?: string; retryCount?: number },
+  ): Promise<NotificationDocument | null> {
+    const update: Record<string, unknown> = { status };
+    if (status === NotificationStatus.SENT) {
+      update['sentAt'] = new Date();
+    }
+    if (extraData?.telegramMessageId) {
+      update['telegramMessageId'] = extraData.telegramMessageId;
+    }
+    if (extraData?.errorMessage) {
+      update['errorMessage'] = extraData.errorMessage;
+    }
+    if (extraData?.retryCount !== undefined) {
+      update['retryCount'] = extraData.retryCount;
+    }
 
-  async updateStatus(id: string, status: NotificationStatus, meta?: Partial<NotificationDocument>): Promise<void> {
-    await this.notificationModel.findByIdAndUpdate(id, {
-      status,
-      ...meta,
-      ...(status === NotificationStatus.SENT ? { sentAt: new Date() } : {}),
-    }).exec();
-
-    const updated = await this.notificationModel.findById(id)
-      .populate('userId', 'name email')
-      .populate('incidentId', 'title severity')
+    const updated = await this.notificationModel
+      .findByIdAndUpdate(id, update, { new: true })
       .exec();
-    this.eventsGateway.emitNotificationUpdated(updated);
-  }
 
-  async getRecentNotifications(limit = 10) {
-    return this.notificationModel
-      .find()
-      .populate('userId', 'name email')
-      .populate('incidentId', 'title severity')
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .exec();
+    if (updated) {
+      this.eventsGateway.emitNotificationUpdated(updated);
+    }
+
+    return updated;
   }
 
   async hasRecentNotification(userId: string, incidentId: string): Promise<boolean> {
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const exists = await this.notificationModel.findOne({
-      userId: new Types.ObjectId(userId),
-      incidentId: new Types.ObjectId(incidentId),
-      createdAt: { $gte: fiveMinutesAgo },
-      status: NotificationStatus.SENT,
-    }).exec();
-    return !!exists;
+    const count = await this.notificationModel
+      .countDocuments({
+        userId: new Types.ObjectId(userId),
+        incidentId: new Types.ObjectId(incidentId),
+        status: { $in: [NotificationStatus.SENT, NotificationStatus.PENDING] },
+      })
+      .exec();
+
+    return count > 0;
   }
 }
